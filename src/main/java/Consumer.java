@@ -1,3 +1,3 @@
 public interface Consumer {
-    public BufElement consume();
+    public BufElement consume() throws InterruptedException;
 }
