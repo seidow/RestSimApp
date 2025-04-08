@@ -13,4 +13,10 @@ public abstract class BufElement {
 
     public int getCustomerID() { return customerID; }
     public String getArrivalTime() { return arrivalTime; }
+    public int getTableNumber(){
+        return tableNumber;
+    }
+    public String getOrder(){
+        return order;
+    }
 }

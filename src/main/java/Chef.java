@@ -29,7 +29,7 @@ public class Chef implements Consumer, Producer, Runnable {
                 BufElement order = consume();
                 if (order instanceof OrderedMeal) {
                     OrderedMeal orderedMeal = (OrderedMeal) order;
-                    String mealName = orderedMeal.getMealName();
+                    String mealName = orderedMeal.getOrder();
                     int prepTime = mealTimes.get(mealName) * 1000; // Convert to milliseconds
 
                     // Simulate preparation time

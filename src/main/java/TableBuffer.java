@@ -9,7 +9,7 @@ public class TableBuffer extends Buffer {
         // Re-add the table as a generic BufElement with minimal required data
         BufElement freedTable = new BufElement(
             orderedMeal.getCustomerID(),   // Could be -1 if not needed
-            orderedMeal.getOrder(),        // Could be null if not needed
+            orderedMeal.getOrder(),  // Could be null if not needed
             orderedMeal.getArrivalTime(),  // Can keep for timestamp/logging
             orderedMeal.getTableNumber()   // The important part
         ) {};
