@@ -1,9 +1,9 @@
 public class CustKiosk implements Producer, Runnable {
-    private final Buffer orderBuffer;
+    private final OrderedMeal orderBuffer;
     private final TableBuffer tableBuffer;
     private final Customer customer;
 
-    public CustKiosk(Buffer orderBuffer, TableBuffer tableBuffer, Customer customer) {
+    public CustKiosk(OrderedMeal orderBuffer, TableBuffer tableBuffer, Customer customer) {
         this.orderBuffer = orderBuffer;
         this.tableBuffer = tableBuffer;
         this.customer = customer;
@@ -39,6 +39,7 @@ public class CustKiosk implements Producer, Runnable {
 
     @Override
     public void produce(BufElement item) throws InterruptedException {
-        orderBuffer.produce(item);
+//        orderBuffer.produce(item);
+        
     }
 }
