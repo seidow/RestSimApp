@@ -1,3 +1,4 @@
+
 import java.util.Map;
 
 public class Chef implements Consumer, Producer, Runnable {
@@ -13,6 +14,28 @@ public class Chef implements Consumer, Producer, Runnable {
     }
 
     @Override
+    public void run() {
+        try {
+            while (running) {
+                BufElement order = consume();
+                if (order instanceof OrderedMeal om) {
+                    int prepTime = mealTimes.getOrDefault(om.getOrder(), 5) * 1000;
+
+                    System.out.printf("[%s] Chef starts preparing %s for Customer %d%n",
+                            om.getArrivalTime(), om.getOrder(), om.getCustomerID());
+                    Thread.sleep(prepTime);
+                    System.out.printf("[%s] Chef finishes preparing %s for Customer %d%n",
+                            om.getArrivalTime(), om.getOrder(), om.getCustomerID());
+
+                    produce(om);
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @Override
     public BufElement consume() throws InterruptedException {
         return orderBuffer.consume();
     }
@@ -20,28 +43,6 @@ public class Chef implements Consumer, Producer, Runnable {
     @Override
     public void produce(BufElement item) throws InterruptedException {
         mealBuffer.produce(item);
-    }
-
-    @Override
-    public void run() {
-        try {
-            while (running) {
-                BufElement order = consume();
-                if (order instanceof OrderedMeal) {
-                    OrderedMeal orderedMeal = (OrderedMeal) order;
-                    String mealName = orderedMeal.getOrder();
-                    int prepTime = mealTimes.get(mealName) * 1000; // Convert to milliseconds
-
-                    // Simulate preparation time
-                    Thread.sleep(prepTime);
-
-                    // Produce cooked meal
-                    produce(orderedMeal);
-                }
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     public void stop() {

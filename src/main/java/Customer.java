@@ -2,7 +2,7 @@
 public class Customer {
     private final int customerID;
     private final String arrivalTime;
-    private final String order;
+    private final String order; //******?
 
     // Constructor now accepts the preparation times map
     public Customer(int customerID, String arrivalTime, String order) {
