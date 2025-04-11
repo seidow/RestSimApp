@@ -5,11 +5,8 @@ public class TableBuffer extends Buffer {
 
     // Called by Waiter to mark table as available again
     public void consumAt(OrderedMeal meal) throws InterruptedException {
-        BufElement table = new BufElement(-1, "TABLE", "N/A", meal.getTableNumber()) {};
-        super.produce(table);
-
-        System.out.printf("[%s] Table %d is now available again (from Customer %d)%n",
-                meal.getArrivalTime(), meal.getTableNumber(), meal.getCustomerID());
+    BufElement table = new BufElement(-1, "TABLE", "N/A", meal.getTableNumber()) {};
+    super.produce(table);
     }
 }
 

@@ -1,33 +1,40 @@
-
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.Semaphore;
 
 public class Buffer {
-    private final Queue<BufElement> queue = new LinkedList<>();
-    private final Semaphore availableSlots;
-    private final Semaphore filledSlots = new Semaphore(0);
-    private final Object lock = new Object();
+    private final Queue<BufElement> buffer = new LinkedList<>();
+    private final Semaphore mutex;      // Controls access to the queue (binary semaphore)
+    private final Semaphore spaces;     // Tracks available slots (empty spaces)
+    private final Semaphore items;      // Tracks filled slots (items to consume)
 
     public Buffer(int capacity) {
-        this.availableSlots = new Semaphore(capacity);
+        this.mutex = new Semaphore(1); // Acts as a lock for mutual exclusion
+        this.spaces = new Semaphore(capacity);
+        this.items = new Semaphore(0);
     }
 
     public void produce(BufElement item) throws InterruptedException {
-        availableSlots.acquire(); // wait if buffer is full
-        synchronized (lock) {
-            queue.add(item);
+        spaces.acquire(); // Wait for empty space
+        mutex.acquire();  // Lock the queue
+        try {
+            buffer.add(item);
+        } finally {
+            mutex.release(); // Unlock the queue
         }
-        filledSlots.release(); // signal consumer
+        items.release(); // Signal that an item is available
     }
 
     public BufElement consume() throws InterruptedException {
-        filledSlots.acquire(); // wait if buffer is empty
+        items.acquire();  // Wait for an item to consume
+        mutex.acquire(); // Lock the queue
         BufElement item;
-        synchronized (lock) {
-            item = queue.poll();
+        try {
+            item = buffer.poll();
+        } finally {
+            mutex.release(); // Unlock the queue
         }
-        availableSlots.release(); // signal producer
+        spaces.release(); // Signal that a space is free
         return item;
     }
 }
