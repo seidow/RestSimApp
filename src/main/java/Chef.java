@@ -1,15 +1,14 @@
-
 import java.util.Map;
 
 public class Chef implements Consumer, Producer, Runnable {
-
     private final Buffer orderBuffer;
     private final Buffer mealBuffer;
-    private final Map<String, Integer> mealTimes; // Pass total minutes directly, not "00:08" format
+    private final Map<String, Integer> mealTimes;
     private final long timeMultiplier;
     private final SimulationStats stats;
 
-    public Chef(Buffer orderBuffer, Buffer mealBuffer, Map<String, Integer> mealTimes, long timeMultiplier, SimulationStats stats) {
+    public Chef(Buffer orderBuffer, Buffer mealBuffer, Map<String, Integer> mealTimes, 
+                long timeMultiplier, SimulationStats stats) {
         this.orderBuffer = orderBuffer;
         this.mealBuffer = mealBuffer;
         this.mealTimes = mealTimes;
@@ -17,39 +16,45 @@ public class Chef implements Consumer, Producer, Runnable {
         this.stats = stats;
     }
 
-   @Override
+    @Override
     public void run() {
         try {
-            // Exit loop when interrupted
             while (!Thread.currentThread().isInterrupted()) {
                 BufElement order = consume();
-                 if ("TERMINATE_CHEF".equals(order.getOrder())) {
-                break; // Exit loop
-            }
-                if (order instanceof OrderedMeal om) {
-                    int prepMinutes = mealTimes.getOrDefault(om.getOrder(), 0);
-                    String startPrepTime = om.getArrivalTime();
-                    String endPrepTime = addMinutesToTime(startPrepTime, prepMinutes);
+                
+                // Termination check
+                if (order != null && "TERMINATE_CHEF".equals(order.getOrder())) {
+                    break; // Exit on termination signal
+                }
 
+                if (order instanceof OrderedMeal om) {
+                    // Use ACTUAL start time, not customer's arrival time
+                    String startTime = RestSimApp.getCurrentSimulationTime();
+                    int prepMinutes = mealTimes.getOrDefault(om.getOrder(), 0);
+
+                    // Log start time correctly
                     System.out.printf("[%s] Chef starts preparing %s for Customer %d%n",
-                            startPrepTime, om.getOrder(), om.getCustomerID());
+                            startTime, om.getOrder(), om.getCustomerID());
                     System.out.flush();
 
-                    // Simulate preparation time (single sleep)
+                    // Simulate preparation time (SLEEP ONCE)
                     Thread.sleep(prepMinutes * timeMultiplier);
 
-                    om.setReadyTime(endPrepTime);
+                    // Calculate end time correctly
+                    String endTime = addMinutesToTime(startTime, prepMinutes);
+                    om.setReadyTime(endTime);
 
+                    // Log completion
                     System.out.printf("[%s] Chef finishes preparing %s for Customer %d%n",
-                            endPrepTime, om.getOrder(), om.getCustomerID());
+                            endTime, om.getOrder(), om.getCustomerID());
                     System.out.flush();
-                    stats.recordMealReady(om.getCustomerID(), endPrepTime);
+                    stats.recordMealReady(om.getCustomerID(), endTime);
 
                     produce(om);
                 }
             }
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); // Preserve interrupt status
+            Thread.currentThread().interrupt();
         }
     }
 
