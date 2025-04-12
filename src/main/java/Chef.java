@@ -7,12 +7,14 @@ public class Chef implements Consumer, Producer, Runnable {
     private final Buffer mealBuffer;
     private final Map<String, Integer> mealTimes; // Pass total minutes directly, not "00:08" format
     private final long timeMultiplier;
+    private final SimulationStats stats;
 
-    public Chef(Buffer orderBuffer, Buffer mealBuffer, Map<String, Integer> mealTimes, long timeMultiplier) {
+    public Chef(Buffer orderBuffer, Buffer mealBuffer, Map<String, Integer> mealTimes, long timeMultiplier, SimulationStats stats) {
         this.orderBuffer = orderBuffer;
         this.mealBuffer = mealBuffer;
         this.mealTimes = mealTimes;
         this.timeMultiplier = timeMultiplier;
+        this.stats = stats;
     }
 
    @Override
@@ -21,6 +23,9 @@ public class Chef implements Consumer, Producer, Runnable {
             // Exit loop when interrupted
             while (!Thread.currentThread().isInterrupted()) {
                 BufElement order = consume();
+                 if ("TERMINATE_CHEF".equals(order.getOrder())) {
+                break; // Exit loop
+            }
                 if (order instanceof OrderedMeal om) {
                     int prepMinutes = mealTimes.getOrDefault(om.getOrder(), 0);
                     String startPrepTime = om.getArrivalTime();
@@ -28,6 +33,7 @@ public class Chef implements Consumer, Producer, Runnable {
 
                     System.out.printf("[%s] Chef starts preparing %s for Customer %d%n",
                             startPrepTime, om.getOrder(), om.getCustomerID());
+                    System.out.flush();
 
                     // Simulate preparation time (single sleep)
                     Thread.sleep(prepMinutes * timeMultiplier);
@@ -36,6 +42,8 @@ public class Chef implements Consumer, Producer, Runnable {
 
                     System.out.printf("[%s] Chef finishes preparing %s for Customer %d%n",
                             endPrepTime, om.getOrder(), om.getCustomerID());
+                    System.out.flush();
+                    stats.recordMealReady(om.getCustomerID(), endPrepTime);
 
                     produce(om);
                 }

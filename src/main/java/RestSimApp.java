@@ -7,10 +7,13 @@ import java.util.concurrent.*;
 public class RestSimApp {
 
     private static final TimeUnit TIME_UNIT = TimeUnit.MILLISECONDS;
-    private static final long SIMULATION_TIME_MULTIPLIER = 100; // 100ms = 1 minute
-    
+    private static final long SIMULATION_TIME_MULTIPLIER = 1000; // 1 second = 1 minute
+    private static final SimulationStats stats = new SimulationStats();
+    private static long simulationStartTime;
+    private static int baseTime;
 
     public static void main(String[] args) {
+        simulationStartTime = System.currentTimeMillis();
         try (BufferedReader reader = new BufferedReader(new FileReader("input.txt"))) {
             // Read configuration
             String[] config = reader.readLine().split(" ");
@@ -44,19 +47,13 @@ public class RestSimApp {
             Buffer mealBuffer = new Buffer(10);
             TableBuffer tables = new TableBuffer(numTables);
 
-            // Initialize tables
-            for (int i = 1; i <= numTables; i++) {
-                tables.produce(new BufElement(-1, "", "", i) {
-                });
-            }
-
             // Start chefs and waiters
             for (int i = 0; i < numChefs; i++) {
-                executor.submit(new Chef(orderBuffer, mealBuffer, mealTimes, SIMULATION_TIME_MULTIPLIER));
+                executor.submit(new Chef(orderBuffer, mealBuffer, mealTimes, SIMULATION_TIME_MULTIPLIER, stats));
             }
             List<Waiter> waiters = new ArrayList<>();
             for (int i = 0; i < numWaiters; i++) {
-                Waiter waiter = new Waiter(mealBuffer, tables, i + 1, SIMULATION_TIME_MULTIPLIER);
+                Waiter waiter = new Waiter(mealBuffer, tables, i + 1, SIMULATION_TIME_MULTIPLIER, stats);
                 waiters.add(waiter);
                 executor.submit(waiter);
             }
@@ -64,20 +61,54 @@ public class RestSimApp {
             // Schedule customers with proper delays
             if (!customerList.isEmpty()) {
                 String firstArrival = customerList.get(0).getArrivalTime();
-                int baseTime = parseTimeToMinutes(firstArrival);
+                baseTime = parseTimeToMinutes(firstArrival);
+                setBaseTime(baseTime);
 
                 for (Customer customer : customerList) {
                     int arrivalMinutes = parseTimeToMinutes(customer.getArrivalTime());
                     long delay = (arrivalMinutes - baseTime) * SIMULATION_TIME_MULTIPLIER;
 
                     scheduler.schedule(() -> {
+                        String currentTime = getCurrentSimulationTime();
                         System.out.printf("[%s] Customer %d Arrives%n",
-                                customer.getArrivalTime(), customer.getCustomerID());
-                        executor.submit(new CustKiosk(orderBuffer, tables, customer));
+                                currentTime, customer.getCustomerID());
+                        executor.submit(new CustKiosk(orderBuffer, tables, customer, stats));
                     }, delay, TIME_UNIT);
+
                 }
+
             }
-            // Shutdown scheduler and wait for customers
+            // Calculate maximum preparation and eating times
+            int maxPrepTime = mealTimes.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+            int maxEatingTime = 20; // Maximum eating time (from Waiter's random 5-20)
+
+            // Get the last customer's arrival time
+            Customer lastCustomer = customerList.get(customerList.size() - 1);
+            int lastArrivalMinutes = parseTimeToMinutes(lastCustomer.getArrivalTime());
+            long lastDelay = (lastArrivalMinutes - baseTime) * SIMULATION_TIME_MULTIPLIER;
+
+            // Calculate total delay for terminators
+            long terminatorDelay = lastDelay + (maxPrepTime + maxEatingTime) * SIMULATION_TIME_MULTIPLIER;
+            
+            // Schedule termination signals
+            scheduler.schedule(() -> {
+                try {
+                    // Send termination to chefs
+                    for (int i = 0; i < numChefs; i++) {
+                        orderBuffer.produce(new BufElement(-1, "TERMINATE_CHEF", "00:00", -1) {
+                        });
+                    }
+                    // Send termination to waiters
+                    for (int i = 0; i < numWaiters; i++) {
+                        mealBuffer.produce(new BufElement(-1, "TERMINATE_WAITER", "00:00", -1) {
+                        });
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }, terminatorDelay, TimeUnit.MILLISECONDS);
+
+// Proceed to shutdown the scheduler
             scheduler.shutdown();
             try {
                 if (!scheduler.awaitTermination(1, TimeUnit.HOURS)) {
@@ -87,21 +118,19 @@ public class RestSimApp {
                 Thread.currentThread().interrupt();
             }
 
-            // Shutdown executor and force termination if needed
-            executor.shutdown();
-            try {
-                // Wait long enough for delayed tasks (e.g., eating)
-                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                    executor.shutdownNow(); // Force shutdown
-                }
-            } catch (InterruptedException e) {
-                executor.shutdownNow();
-            }
-
             // Shutdown waiter schedulers explicitly
-            waiters.forEach(Waiter::shutdown);
+            waiters.forEach(waiter -> {
+                waiter.shutdown();
+                try {
+                    waiter.awaitTermination();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+//            waiters.forEach(Waiter::shutdown);
 
             System.out.println("[End of Simulation]");
+            stats.printSummary();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -127,6 +156,10 @@ public class RestSimApp {
         return Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
     }
 
+    public static void setBaseTime(int baseTimeMinutes) {
+        baseTime = baseTimeMinutes;
+    }
+
     private static Map<String, String> parseCustomerInfo(String line) {
         Map<String, String> customerInfo = new HashMap<>();
         String[] entries = line.split(" ");
@@ -135,6 +168,15 @@ public class RestSimApp {
             customerInfo.put(parts[0], parts[1]);
         }
         return customerInfo;
+    }
+
+    public static String getCurrentSimulationTime() {
+        long elapsedMillis = System.currentTimeMillis() - simulationStartTime;
+        long totalSimulationMinutes = elapsedMillis / SIMULATION_TIME_MULTIPLIER;
+        long currentTimeMinutes = baseTime + totalSimulationMinutes;
+        int hours = (int) (currentTimeMinutes / 60) % 24;
+        int minutes = (int) (currentTimeMinutes % 60);
+        return String.format("%02d:%02d", hours, minutes);
     }
 
 }

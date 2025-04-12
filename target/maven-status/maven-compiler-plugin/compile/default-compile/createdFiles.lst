@@ -1,4 +1,5 @@
 Consumer.class
+TableBuffer$2.class
 Waiter.class
 TableBuffer.class
 BufElement.class
@@ -8,6 +9,9 @@ Producer.class
 Customer.class
 Buffer.class
 OrderedMeal.class
+RestSimApp$2.class
 CustKiosk.class
+SimulationStats.class
 RestSimApp.class
 TableBuffer$1.class
+SimulationStats$CustomerRecord.class
